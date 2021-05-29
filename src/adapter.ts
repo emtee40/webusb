@@ -24,7 +24,7 @@
 */
 
 import { EventEmitter } from "events";
-import usb, {
+import {
     getDeviceList,
     Device,
     Endpoint,
@@ -32,6 +32,7 @@ import usb, {
     OutEndpoint,
     ConfigDescriptor,
     InterfaceDescriptor,
+    on,
     removeListener,
     LIBUSB_ENDPOINT_IN,
     LIBUSB_ENDPOINT_OUT,
@@ -151,9 +152,9 @@ export class USBAdapter extends EventEmitter implements Adapter {
             }
 
             if (event === USBAdapter.EVENT_DEVICE_CONNECT) {
-                usb.on("attach", attachCallback);
+                on("attach", attachCallback);
             } else if (event === USBAdapter.EVENT_DEVICE_DISCONNECT) {
-                usb.on("detach", detachCallback);
+                on("detach", detachCallback);
             }
         });
 
@@ -465,7 +466,11 @@ export class USBAdapter extends EventEmitter implements Adapter {
             this.openDevice(device)
             .then(() => {
                 device.getStringDescriptor(index, (error, buffer) => {
-                    device.close();
+                    try {
+                        // Older macs (<10.12) can error with some host devices during a close at this point
+                        device.close();
+                    // tslint:disable-next-line:no-empty
+                    } catch (_error) {}
                     resolve(error ? "" : buffer.toString());
                 });
             })
