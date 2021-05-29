@@ -1,5 +1,6 @@
 {
     "compilerOptions": {
+        "moduleResolution": "node",
         "target": "es6",
         "alwaysStrict": true,
         "noEmitOnError": true,
@@ -7,6 +8,7 @@
         "noUnusedParameters": true,
         "sourceMap": true,
         "declaration": true,
-        "declarationDir": "types"
+        "declarationDir": "types",
+        "skipLibCheck": true
     }
 }

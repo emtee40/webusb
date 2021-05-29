@@ -5,6 +5,7 @@
   "homepage": "https://github.com/thegecko/webusb",
   "author": "Rob Moran <rob@thegecko.org>",
   "license": "MIT",
+  "browser": "browser.js",
   "main": "dist/webusb.umd.js",
   "module": "dist/webusb.esm.js",
   "types": "types/index.d.ts",
@@ -40,6 +41,6 @@
     "@types/node": "^8.0.54",
     "@types/usb": "^1.5.1",
     "@types/w3c-web-usb": "^1.0.4",
-    "usb": "^1.6.0"
+    "usb": "^1.7.1"
   }
 }

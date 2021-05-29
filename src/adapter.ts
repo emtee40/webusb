@@ -442,7 +442,7 @@ export class USBAdapter extends EventEmitter implements Adapter {
                         productName: productName,
                         serialNumber: serialNumber,
                         configurations: configurations,
-                        _currentConfiguration: configDescriptor.bConfigurationValue
+                        _currentConfiguration: configDescriptor?.bConfigurationValue
                     };
                     return resolve(new USBDevice(props));
                 });
