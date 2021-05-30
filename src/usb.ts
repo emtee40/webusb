@@ -59,6 +59,7 @@ export interface USBEvents {
 export class USB extends (EventDispatcher as new() => TypedDispatcher<USBEvents>) implements W3CUSB {
 
     private allowedDevices: Array<Device> = [];
+    private autoAllowDevices: USBDeviceRequestOptions;
     private devicesFound: (devices: Array<USBDevice>) => Promise<USBDevice | void>;
 
     private _onconnect: (ev: USBConnectionEvent) => void;
@@ -91,7 +92,7 @@ export class USB extends (EventDispatcher as new() => TypedDispatcher<USBEvents>
 
         const deviceConnectCallback = device => {
             // When connected, emit an event if it was a known allowed device
-            if (this.replaceAllowedDevice(device)) {
+            if (this.isAllowedDevice(device)) {
                 const event = new W3CUSBConnectionEvent(this as EventTarget, "connect", { device }) as USBConnectionEvent;
                 this.dispatchEvent(event);
 
@@ -144,12 +145,17 @@ export class USB extends (EventDispatcher as new() => TypedDispatcher<USBEvents>
         });
     }
 
-    private replaceAllowedDevice(device: Device): boolean {
+    private isAllowedDevice(device: Device) {
         for (const i in this.allowedDevices) {
             if (this.isSameDevice(device, this.allowedDevices[i])) {
                 this.allowedDevices[i] = device;
                 return true;
             }
+        }
+
+        if (this.autoAllowDevices && this.filterDevice(this.autoAllowDevices, device)) {
+            this.allowedDevices.push(device);
+            return true;
         }
 
         return false;
@@ -172,21 +178,22 @@ export class USB extends (EventDispatcher as new() => TypedDispatcher<USBEvents>
             // Class
             if (filter.classCode) {
 
-                // Interface Descriptors
-                const match = device.configuration.interfaces.some(iface => {
-                    // Class
-                    if (filter.classCode && filter.classCode !== iface.alternate.interfaceClass) return false;
+                // Configurations
+                for (const configuration of device.configurations) {
+                    // Interface Descriptors
+                    for (const iface of configuration.interfaces) {
+                        // Class
+                        if (filter.classCode && filter.classCode !== iface.alternate.interfaceClass) continue;
 
-                    // Subclass
-                    if (filter.subclassCode && filter.subclassCode !== iface.alternate.interfaceSubclass) return false;
+                        // Subclass
+                        if (filter.subclassCode && filter.subclassCode !== iface.alternate.interfaceSubclass) continue;
 
-                    // Protocol
-                    if (filter.protocolCode && filter.protocolCode !== iface.alternate.interfaceProtocol) return false;
+                        // Protocol
+                        if (filter.protocolCode && filter.protocolCode !== iface.alternate.interfaceProtocol) continue;
 
-                    return true;
-                });
-
-                if (match) return true;
+                        return true;
+                    }
+                }
             }
 
             // Class
@@ -203,6 +210,10 @@ export class USB extends (EventDispatcher as new() => TypedDispatcher<USBEvents>
 
             return true;
         });
+    }
+
+    public allowDevices(options: USBDeviceRequestOptions) {
+        this.autoAllowDevices = options;
     }
 
     /**
@@ -228,13 +239,7 @@ export class USB extends (EventDispatcher as new() => TypedDispatcher<USBEvents>
                     return false;
                 }
 
-                for (const i in this.allowedDevices) {
-                    if (this.isSameDevice(device, this.allowedDevices[i])) {
-                        return true;
-                    }
-                }
-
-                return false;
+                return this.isAllowedDevice(device);
             });
 
             return allowed;
@@ -296,13 +301,13 @@ export class USB extends (EventDispatcher as new() => TypedDispatcher<USBEvents>
                     return reject(new Error("requestDevice error: no devices found"));
                 }
 
-                function selectFn(device: USBDevice) {
-                    if (!this.replaceAllowedDevice(device)) this.allowedDevices.push(device);
+                const selectFn = (device: Device) => {
+                    if (!this.isAllowedDevice(device)) this.allowedDevices.push(device);
                     resolve(device);
                 }
 
                 // If no devicesFound function, select the first device found
-                if (!this.devicesFound) return selectFn.call(this, devices[0]);
+                if (!this.devicesFound) return selectFn(devices[0]);
 
                 return this.devicesFound(devices)
                 .then(device => {
