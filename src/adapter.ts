@@ -24,7 +24,7 @@
 */
 
 import { EventEmitter } from "events";
-import {
+import usb, {
     getDeviceList,
     Device,
     Endpoint,
@@ -32,7 +32,6 @@ import {
     OutEndpoint,
     ConfigDescriptor,
     InterfaceDescriptor,
-    on,
     removeListener,
     LIBUSB_ENDPOINT_IN,
     LIBUSB_ENDPOINT_OUT,
@@ -152,9 +151,9 @@ export class USBAdapter extends EventEmitter implements Adapter {
             }
 
             if (event === USBAdapter.EVENT_DEVICE_CONNECT) {
-                on("attach", attachCallback);
+                usb.on("attach", attachCallback);
             } else if (event === USBAdapter.EVENT_DEVICE_DISCONNECT) {
-                on("detach", detachCallback);
+                usb.on("detach", detachCallback);
             }
         });
 

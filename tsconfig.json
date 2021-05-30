@@ -4,6 +4,7 @@
         "moduleResolution": "node",
         "target": "es6",
         "module": "commonjs",
+        "esModuleInterop": true,
         "outDir": "dist",
         "alwaysStrict": true,
         "noEmitOnError": true,
