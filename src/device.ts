@@ -191,7 +191,7 @@ export class USBDevice implements W3CUSBDevice {
         let endpoint = null;
         let iface = null;
 
-        this.configuration.interfaces.some(usbInterface => {
+        this.configuration?.interfaces.some(usbInterface => {
             endpoint = usbInterface.alternate.endpoints.find(usbEndpoint => {
                 return (usbEndpoint.endpointNumber === endpointNumber && usbEndpoint.direction === direction);
             });
@@ -209,7 +209,7 @@ export class USBDevice implements W3CUSBDevice {
     private setupInvalid(setup: USBControlTransferParameters): string {
         if (setup.recipient === "interface") {
             const interfaceNumber = setup.index & 0xff; // lower 8 bits
-            const iface = this.configuration.interfaces.find(usbInterface => usbInterface.interfaceNumber === interfaceNumber);
+            const iface = this.configuration?.interfaces.find(usbInterface => usbInterface.interfaceNumber === interfaceNumber);
             if (!iface) return "interface not found";
             if (!iface.claimed) return "invalid state";
 
@@ -247,8 +247,8 @@ export class USBDevice implements W3CUSBDevice {
             if (!this.connected) return reject(new Error("close error: device not found"));
             if (!this.opened) return resolve();
 
-            const releaseInterfacePromises = this.configuration.interfaces.map(
-                iface => this.releaseInterface(iface.interfaceNumber));
+            const releaseInterfacePromises = this.configuration?.interfaces.map(
+                iface => this.releaseInterface(iface.interfaceNumber)) || [];
 
             Promise.all(releaseInterfacePromises)
             .catch(_error => { /* Ignore */ })
@@ -281,7 +281,7 @@ export class USBDevice implements W3CUSBDevice {
             adapter.selectConfiguration(this._handle, configurationValue)
             .then(() => {
                 this._currentConfiguration = configurationValue;
-                this.configuration.interfaces.forEach(iface => iface.reset());
+                this.configuration?.interfaces.forEach(iface => iface.reset());
                 resolve();
             })
             .catch(error => {
@@ -299,7 +299,7 @@ export class USBDevice implements W3CUSBDevice {
         return new Promise((resolve, reject) => {
             if (!this.connected) return reject(new Error("claimInterface error: device not found"));
 
-            const iface = this.configuration.interfaces.find(usbInterface => usbInterface.interfaceNumber === interfaceNumber);
+            const iface = this.configuration?.interfaces.find(usbInterface => usbInterface.interfaceNumber === interfaceNumber);
             if (!iface) return reject(new Error("claimInterface error: interface not found"));
             if (!this.opened) return reject(new Error("claimInterface error: invalid state"));
             if (iface.claimed) return resolve();
@@ -321,7 +321,7 @@ export class USBDevice implements W3CUSBDevice {
         return new Promise((resolve, reject) => {
             if (!this.connected) return reject(new Error("releaseInterface error: device not found"));
 
-            const iface = this.configuration.interfaces.find(usbInterface => usbInterface.interfaceNumber === interfaceNumber);
+            const iface = this.configuration?.interfaces.find(usbInterface => usbInterface.interfaceNumber === interfaceNumber);
             if (!iface) return reject(new Error("releaseInterface error: interface not found"));
             if (!this.opened) return reject(new Error("releaseInterface error: invalid state"));
             if (!iface.claimed) return resolve();
@@ -344,7 +344,7 @@ export class USBDevice implements W3CUSBDevice {
         return new Promise((resolve, reject) => {
             if (!this.connected) return reject(new Error("selectAlternateInterface error: device not found"));
 
-            const iface = this.configuration.interfaces.find(usbInterface => usbInterface.interfaceNumber === interfaceNumber);
+            const iface = this.configuration?.interfaces.find(usbInterface => usbInterface.interfaceNumber === interfaceNumber);
             if (!iface) return reject(new Error("selectAlternateInterface error: interface not found"));
 
             if (!this.opened || !iface.claimed) return reject(new Error("selectAlternateInterface error: invalid state"));
