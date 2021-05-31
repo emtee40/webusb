@@ -1,5 +1,5 @@
 {
-  "name": "@koush/webusb",
+  "name": "webusb",
   "version": "2.2.9",
   "description": "Node.js implementation of the WebUSB Specification",
   "homepage": "https://github.com/thegecko/webusb",
