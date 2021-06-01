@@ -293,25 +293,21 @@ export class USBAdapter extends EventEmitter implements Adapter {
         });
     }
 
-    private getCapabilities(device: Device, retries: number): Promise<Array<Capability>> {
-        return new Promise((resolve, _reject) => {
-
-            this.openDevice(device, retries)
-            .then(() => {
-                device.getCapabilities((error, capabilities) => {
-                    try {
-                        // Older macs (<10.12) can error with some host devices during a close at this point
-                        device.close();
-                    // tslint:disable-next-line:no-empty
-                    } catch (_error) {}
-                    if (error) return resolve([]);
-                    resolve(capabilities);
-                });
-            })
-            .catch(_error => {
-                resolve([]);
-            });
-        });
+    private async getCapabilities(device: Device, retries: number): Promise<Array<Capability>> {
+        this.openDevice(device, retries);
+        try {
+            return await device.getCapabilities();
+        }
+        catch (e) {
+            return [];
+        }
+        finally {
+            try {
+                // Older macs (<10.12) can error with some host devices during a close at this point
+                device.close();
+            // tslint:disable-next-line:no-empty
+            } catch (_error) {}
+        }
     }
 
     private getWebCapability(capabilities: Array<Capability>): Capability {
@@ -464,23 +460,21 @@ export class USBAdapter extends EventEmitter implements Adapter {
         };
     }
 
-    private getStringDescriptor(device: Device, index: number): Promise<string> {
-        return new Promise(resolve => {
-            this.openDevice(device)
-            .then(() => {
-                device.getStringDescriptor(index, (error, buffer) => {
-                    try {
-                        // Older macs (<10.12) can error with some host devices during a close at this point
-                        device.close();
-                    // tslint:disable-next-line:no-empty
-                    } catch (_error) {}
-                    resolve(error ? "" : buffer.toString());
-                });
-            })
-            .catch(_error => {
-                resolve("");
-            });
-        });
+    private async getStringDescriptor(device: Device, index: number): Promise<string> {
+        this.openDevice(device)
+        try {
+            return await device.getStringDescriptor(index);
+        }
+        catch(e) {
+            return "";
+        }
+        finally {
+            try {
+                // Older macs (<10.12) can error with some host devices during a close at this point
+                device.close();
+            // tslint:disable-next-line:no-empty
+            } catch (_error) {}
+        }
     }
 
     private bufferToDataView(buffer: Buffer): DataView {
