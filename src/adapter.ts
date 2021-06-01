@@ -184,7 +184,7 @@ export class USBAdapter extends EventEmitter implements Adapter {
         return `${device.busNumber}.${device.deviceAddress}`;
     }
 
-    private serialDevicePromises<T>(task: (device: Device, descriptor: any) => Promise<T>, device: Device, descriptors: Array<any>): Promise<Array<T>> {
+    private async serialDevicePromises<T>(task: (device: Device, descriptor: any) => Promise<T>, device: Device, descriptors: Array<any>): Promise<Array<T>> {
         function reducer(chain, descriptor) {
             return chain
                 .then(results => {
@@ -568,7 +568,7 @@ export class USBAdapter extends EventEmitter implements Adapter {
     public async close(handle: string): Promise<void> {
         const device = this.getDevice(handle);
         device.close();
-}
+    }
 
     public async selectConfiguration(handle: string, id: number): Promise<void> {
         const device = this.getDevice(handle);
@@ -578,7 +578,7 @@ export class USBAdapter extends EventEmitter implements Adapter {
     public async claimInterface(handle: string, address: number): Promise<void> {
         const device = this.getDevice(handle);
         device.interface(address).claim();
-}
+    }
 
     public async releaseInterface(handle: string, address: number): Promise<void> {
         const device = this.getDevice(handle);
@@ -640,7 +640,7 @@ export class USBAdapter extends EventEmitter implements Adapter {
         }
     }
 
-    public clearHalt(handle: string, direction: USBDirection, endpointNumber: number): Promise<void> {
+    public async clearHalt(handle: string, direction: USBDirection, endpointNumber: number): Promise<void> {
         const device = this.getDevice(handle);
         const endpoint = this.getEndpoint(device, direction, endpointNumber);
         return endpoint.clearHalt();
@@ -694,16 +694,12 @@ export class USBAdapter extends EventEmitter implements Adapter {
         }
     }
 
-    public isochronousTransferIn(_handle: string, _endpointNumber: number, _packetLengths: Array<number>): Promise<USBIsochronousInTransferResult> {
-        return new Promise((_resolve, reject) => {
-            reject("isochronousTransferIn error: method not implemented");
-        });
+    public async isochronousTransferIn(_handle: string, _endpointNumber: number, _packetLengths: Array<number>): Promise<USBIsochronousInTransferResult> {
+        throw new Error("isochronousTransferIn error: method not implemented");
     }
 
     public isochronousTransferOut(_handle: string, _endpointNumber: number, _data: BufferSource, _packetLengths: Array<number>): Promise<USBIsochronousOutTransferResult> {
-        return new Promise((_resolve, reject) => {
-            reject("isochronousTransferOut error: method not implemented");
-        });
+        throw new Error("isochronousTransferOut error: method not implemented");
     }
 
     public reset(handle: string): Promise<void> {
