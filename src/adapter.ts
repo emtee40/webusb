@@ -32,7 +32,13 @@ import usb, {
     OutEndpoint,
     ConfigDescriptor,
     InterfaceDescriptor,
-    removeListener,
+    EndpointDescriptor,
+    DeviceDescriptor,
+    Capability,
+    Constants,
+} from "usb";
+
+const {
     LIBUSB_ENDPOINT_IN,
     LIBUSB_ENDPOINT_OUT,
     LIBUSB_TRANSFER_OVERFLOW,
@@ -46,10 +52,8 @@ import usb, {
     LIBUSB_REQUEST_TYPE_STANDARD,
     LIBUSB_REQUEST_TYPE_CLASS,
     LIBUSB_REQUEST_TYPE_VENDOR,
-    EndpointDescriptor,
-    DeviceDescriptor,
-    Capability
-} from "usb";
+
+} = Constants;
 import { USBConfiguration } from "./configuration";
 import { USBInterface } from "./interface";
 import { USBAlternateInterface } from "./alternate";
@@ -165,9 +169,9 @@ export class USBAdapter extends EventEmitter implements Adapter {
             }
 
             if (event === USBAdapter.EVENT_DEVICE_CONNECT) {
-                removeListener("attach", attachCallback);
+                usb.removeListener("attach", attachCallback);
             } else if (event === USBAdapter.EVENT_DEVICE_DISCONNECT) {
-                removeListener("detach", detachCallback);
+                usb.removeListener("detach", detachCallback);
             }
         });
     }

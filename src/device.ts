@@ -23,7 +23,7 @@
 * SOFTWARE.
 */
 
-import { LIBUSB_ENDPOINT_IN } from "usb";
+import { Constants } from "usb";
 import { USBConfiguration } from "./configuration";
 import { adapter } from "./adapter";
 import { W3CUSBDevice } from "./interfaces";
@@ -215,7 +215,7 @@ export class USBDevice implements W3CUSBDevice {
 
         } else if (setup.recipient === "endpoint") {
             const endpointNumber = setup.index & 0x0f; // lower 4 bits
-            const direction = setup.index & LIBUSB_ENDPOINT_IN ? "in" : "out";
+            const direction = setup.index & Constants.LIBUSB_ENDPOINT_IN ? "in" : "out";
 
             const result = this.getEndpoint(direction, endpointNumber);
             if (!result.endpoint) return "endpoint not found";
