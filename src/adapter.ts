@@ -717,58 +717,52 @@ export class USBAdapter extends EventEmitter implements Adapter {
         return endpoint.clearHalt();
     }
 
-    public transferIn(handle: string, endpointNumber: number, length: number): Promise<USBInTransferResult> {
-        return new Promise((resolve, reject) => {
-            const device = this.getDevice(handle);
-            const endpoint = this.getInEndpoint(device, endpointNumber);
+    public async transferIn(handle: string, endpointNumber: number, length: number): Promise<USBInTransferResult> {
+        const device = this.getDevice(handle);
+        const endpoint = this.getInEndpoint(device, endpointNumber);
 
-            endpoint.transfer(length, (error, data) => {
-                if (error) {
-                    if (error.errno === LIBUSB_TRANSFER_STALL) {
-                        return resolve({
-                            status: "stall"
-                        });
-                    } else if (error.errno === LIBUSB_TRANSFER_OVERFLOW) {
-                        return resolve({
-                            status: "babble"
-                        });
-                    }
-
-                    return reject(error);
-                }
-
-                resolve({
-                    data: this.bufferToDataView(data),
-                    status: "ok"
-                });
-            });
-        });
+        try {
+            const data = await endpoint.transfer(length);
+            return {
+                data: this.bufferToDataView(data),
+                status: "ok"
+            }
+        }
+        catch (error) {
+            if (error.errno === LIBUSB_TRANSFER_STALL) {
+                return {
+                    status: "stall"
+                };
+            } else if (error.errno === LIBUSB_TRANSFER_OVERFLOW) {
+                return {
+                    status: "babble"
+                };
+            }
+            throw error;
+        }
     }
 
-    public transferOut(handle: string, endpointNumber: number, data: BufferSource): Promise<USBOutTransferResult> {
-        return new Promise((resolve, reject) => {
-            const device = this.getDevice(handle);
-            const endpoint = this.getOutEndpoint(device, endpointNumber);
-            const buffer = this.bufferSourceToBuffer(data);
+    public async transferOut(handle: string, endpointNumber: number, data: BufferSource): Promise<USBOutTransferResult> {
+        const device = this.getDevice(handle);
+        const endpoint = this.getOutEndpoint(device, endpointNumber);
+        const buffer = this.bufferSourceToBuffer(data);
 
-            endpoint.transfer(buffer, error => {
-                if (error) {
-                    if (error.errno === LIBUSB_TRANSFER_STALL) {
-                        return resolve({
-                            bytesWritten: 0,
-                            status: "stall"
-                        });
-                    }
-
-                    return reject(error);
-                }
-
-                resolve({
-                    bytesWritten: buffer.byteLength, // hack, should be bytes actually written
-                    status: "ok" // hack
-                });
-            });
-        });
+        try {
+            await endpoint.transfer(buffer);
+            return {
+                bytesWritten: buffer.byteLength, // hack, should be bytes actually written
+                status: "ok" // hack
+            };
+        }
+        catch (error) {
+            if (error.errno === LIBUSB_TRANSFER_STALL) {
+                return {
+                    bytesWritten: 0,
+                    status: "stall"
+                };
+            }
+            throw error;
+        }
     }
 
     public isochronousTransferIn(_handle: string, _endpointNumber: number, _packetLengths: Array<number>): Promise<USBIsochronousInTransferResult> {
