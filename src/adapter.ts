@@ -712,14 +712,9 @@ export class USBAdapter extends EventEmitter implements Adapter {
     }
 
     public clearHalt(handle: string, direction: USBDirection, endpointNumber: number): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const device = this.getDevice(handle);
-            const endpoint = this.getEndpoint(device, direction, endpointNumber);
-            endpoint.clearHalt(error => {
-                if (error) return reject(error);
-                resolve();
-            })
-        });
+        const device = this.getDevice(handle);
+        const endpoint = this.getEndpoint(device, direction, endpointNumber);
+        return endpoint.clearHalt();
     }
 
     public transferIn(handle: string, endpointNumber: number, length: number): Promise<USBInTransferResult> {
