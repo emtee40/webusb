@@ -208,9 +208,9 @@ export class USBAdapter extends EventEmitter implements Adapter {
                 return await fn();
             }
             catch (error) {
-                await this.delay(timeout);
                 if (i === retries)
                     throw error;
+                await this.delay(timeout);
             }
         }
     }
@@ -423,8 +423,8 @@ export class USBAdapter extends EventEmitter implements Adapter {
     }
 
     private async getStringDescriptor(device: Device, index: number): Promise<string> {
-        this.openDevice(device)
         try {
+            await this.openDevice(device)
             return await device.getStringDescriptor(index);
         }
         catch (e) {
