@@ -632,14 +632,8 @@ export class USBAdapter extends EventEmitter implements Adapter {
     }
 
     public selectConfiguration(handle: string, id: number): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const device = this.getDevice(handle);
-
-            device.setConfiguration(id, error => {
-                if (error) return reject(error);
-                resolve();
-            });
-        });
+        const device = this.getDevice(handle);
+        return device.setConfiguration(id);
     }
 
     public claimInterface(handle: string, address: number): Promise<void> {
