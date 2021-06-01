@@ -646,26 +646,15 @@ export class USBAdapter extends EventEmitter implements Adapter {
     }
 
     public releaseInterface(handle: string, address: number): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const device = this.getDevice(handle);
-
-            device.interface(address).release(true, error => {
-                if (error) return reject(error);
-                resolve();
-            });
-        });
+        const device = this.getDevice(handle);
+        return device.interface(address).release();
     }
 
     public selectAlternateInterface(handle: string, interfaceNumber: number, alternateSetting: number): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const device = this.getDevice(handle);
-            const iface = device.interface(interfaceNumber);
+        const device = this.getDevice(handle);
+        const iface = device.interface(interfaceNumber);
 
-            iface.setAltSetting(alternateSetting, error => {
-                if (error) return reject(error);
-                resolve();
-            });
-        });
+        return iface.setAltSetting(alternateSetting);
     }
 
     public controlTransferIn(handle: string, setup: USBControlTransferParameters, length: number): Promise<USBInTransferResult> {
