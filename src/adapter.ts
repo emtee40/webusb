@@ -92,7 +92,7 @@ export interface Adapter {
     getConnected(handle: string): boolean;
     getOpened(handle: string): boolean;
 
-    listUSBDevices(preFilters?: Array<USBDeviceFilter>): Promise<Array<USBDevice>>;
+    listUSBDevices(preFilters?: USBDeviceFilter[]): Promise<USBDevice[]>;
     open(handle: string): Promise<void>;
     close(handle: string): Promise<void>;
     selectConfiguration(handle: string, id: number): Promise<void>;
@@ -104,8 +104,8 @@ export interface Adapter {
     clearHalt(handle: string, direction: USBDirection, endpointNumber: number): Promise<void>;
     transferIn(handle: string, endpointNumber: number, length: number): Promise<USBInTransferResult>;
     transferOut(handle: string, endpointNumber: number, data: BufferSource): Promise<USBOutTransferResult>;
-    isochronousTransferIn(_handle: string, _endpointNumber: number, _packetLengths: Array<number>): Promise<USBIsochronousInTransferResult>;
-    isochronousTransferOut(_handle: string, _endpointNumber: number, _data: BufferSource, _packetLengths: Array<number>): Promise<USBIsochronousOutTransferResult>;
+    isochronousTransferIn(_handle: string, _endpointNumber: number, _packetLengths: number[]): Promise<USBIsochronousInTransferResult>;
+    isochronousTransferOut(_handle: string, _endpointNumber: number, _data: BufferSource, _packetLengths: number[]): Promise<USBIsochronousOutTransferResult>;
     reset(handle: string): Promise<void>;
 }
 
@@ -184,7 +184,7 @@ export class USBAdapter extends EventEmitter implements Adapter {
         return `${device.busNumber}.${device.deviceAddress}`;
     }
 
-    private async serialDevicePromises<T>(task: (device: Device, descriptor: any) => Promise<T>, device: Device, descriptors: Array<any>): Promise<Array<T>> {
+    private async serialDevicePromises<T>(task: (device: Device, descriptor: any) => Promise<T>, device: Device, descriptors: any[]): Promise<T[]> {
         function reducer(chain, descriptor) {
             return chain
                 .then(results => {
@@ -215,31 +215,67 @@ export class USBAdapter extends EventEmitter implements Adapter {
         }
     }
 
-    private async loadDevices(preFilters?: Array<USBDeviceFilter>): Promise<Device[]> {
+    private async loadDevices(preFilters?: USBDeviceFilter[]): Promise<Device[]> {
         // Reset device cache
         this.devices = {};
         let devices = getDeviceList();
 
         if (preFilters) {
             // Pre-filter devices
-            devices = this.preFilterDevices(devices, preFilters);
+            devices = this.filterDevices(devices, preFilters);
         }
 
         return Promise.all(devices.map(device => this.loadDevice(device)));
     }
 
-    private preFilterDevices(devices: Array<Device>, preFilters: Array<USBDeviceFilter>): Array<Device> {
-        // Just pre-filter on vid/pid
-        return devices.filter(device => preFilters.some(filter => {
+    filterDevice(device: Device, filters: USBDeviceFilter[]): boolean {
+        return filters.some(filter => {
             // Vendor
             if (filter.vendorId && filter.vendorId !== device.deviceDescriptor.idVendor) return false;
 
             // Product
             if (filter.productId && filter.productId !== device.deviceDescriptor.idProduct) return false;
 
+            // Class
+            if (filter.classCode) {
+
+                // Configurations
+                for (const configuration of device.allConfigDescriptors) {
+                    // Interface Descriptors
+                    for (const allIface of configuration.interfaces) {
+                        for (const iface of allIface) {
+                            // Class
+                            if (filter.classCode && filter.classCode !== iface.bInterfaceClass) continue;
+
+                            // Subclass
+                            if (filter.subclassCode && filter.subclassCode !== iface.bInterfaceSubClass) continue;
+
+                            // Protocol
+                            if (filter.protocolCode && filter.protocolCode !== iface.bInterfaceProtocol) continue;
+
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            // Class
+            if (filter.classCode && filter.classCode !== device.deviceDescriptor.bDeviceClass) return false;
+
+            // Subclass
+            if (filter.subclassCode && filter.subclassCode !== device.deviceDescriptor.bDeviceSubClass) return false;
+
+            // Protocol
+            if (filter.protocolCode && filter.protocolCode !== device.deviceDescriptor.bDeviceProtocol) return false;
+
             // Ignore serial number for node-usb as it requires device connection
             return true;
-        }));
+        })
+    }
+
+    private filterDevices(devices: Device[], preFilters: USBDeviceFilter[]): Device[] {
+        // Just pre-filter on vid/pid
+        return devices.filter(device => this.filterDevice(device, preFilters));
     }
 
     private async loadDevice(device: Device, retries: number = 0): Promise<Device> {
@@ -267,7 +303,7 @@ export class USBAdapter extends EventEmitter implements Adapter {
         return device;
     }
 
-    private async getCapabilities(device: Device, retries: number): Promise<Array<Capability>> {
+    private async getCapabilities(device: Device, retries: number): Promise<Capability[]> {
         this.openDevice(device, retries);
         try {
             return await device.getCapabilities();
@@ -284,7 +320,7 @@ export class USBAdapter extends EventEmitter implements Adapter {
         }
     }
 
-    private getWebCapability(capabilities: Array<Capability>): Capability {
+    private getWebCapability(capabilities: Capability[]): Capability {
         const platformCapabilities = capabilities.filter(capability => {
             return capability.type === 5;
         });
@@ -356,7 +392,7 @@ export class USBAdapter extends EventEmitter implements Adapter {
         const device = this.devices[handle].device;
         const url = this.devices[handle].url;
 
-        let configs: Array<ConfigDescriptor> = null;
+        let configs: ConfigDescriptor[] = null;
         let configDescriptor: ConfigDescriptor = null;
         let deviceDescriptor: DeviceDescriptor = null;
 
@@ -502,7 +538,7 @@ export class USBAdapter extends EventEmitter implements Adapter {
         });
     }
 
-    private async interfacesToUSBInterface(device: Device, descriptors: Array<InterfaceDescriptor>): Promise<USBInterface> {
+    private async interfacesToUSBInterface(device: Device, descriptors: InterfaceDescriptor[]): Promise<USBInterface> {
         const alternates = await this.serialDevicePromises(this.interfaceToUSBAlternateInterface, device, descriptors);
         return new USBInterface({
             _handle: this.getDeviceHandle(device),
@@ -554,7 +590,7 @@ export class USBAdapter extends EventEmitter implements Adapter {
         return (device.interfaces !== null);
     }
 
-    public async listUSBDevices(preFilters?: Array<USBDeviceFilter>): Promise<USBDevice[]> {
+    public async listUSBDevices(preFilters?: USBDeviceFilter[]): Promise<USBDevice[]> {
         await this.loadDevices(preFilters);
         return Promise.all(Object.keys(this.devices).map(device => this.devicetoUSBDevice(device)));
     }
@@ -693,11 +729,11 @@ export class USBAdapter extends EventEmitter implements Adapter {
         }
     }
 
-    public async isochronousTransferIn(_handle: string, _endpointNumber: number, _packetLengths: Array<number>): Promise<USBIsochronousInTransferResult> {
+    public async isochronousTransferIn(_handle: string, _endpointNumber: number, _packetLengths: number[]): Promise<USBIsochronousInTransferResult> {
         throw new Error("isochronousTransferIn error: method not implemented");
     }
 
-    public isochronousTransferOut(_handle: string, _endpointNumber: number, _data: BufferSource, _packetLengths: Array<number>): Promise<USBIsochronousOutTransferResult> {
+    public isochronousTransferOut(_handle: string, _endpointNumber: number, _data: BufferSource, _packetLengths: number[]): Promise<USBIsochronousOutTransferResult> {
         throw new Error("isochronousTransferOut error: method not implemented");
     }
 

@@ -36,7 +36,7 @@ export interface USBOptions {
     /**
      * A `device found` callback function to allow the user to select a device
      */
-    devicesFound?: (devices: Array<USBDevice>) => Promise<USBDevice | void>;
+    devicesFound?: (devices: USBDevice[]) => Promise<USBDevice | void>;
 }
 
 /**
@@ -58,9 +58,9 @@ export interface USBEvents {
  */
 export class USB extends (EventDispatcher as new() => TypedDispatcher<USBEvents>) implements W3CUSB {
 
-    private allowedDevices: Array<Device> = [];
+    private allowedDevices: Device[] = [];
     private autoAllowDevices: USBDeviceRequestOptions;
-    private devicesFound: (devices: Array<USBDevice>) => Promise<USBDevice | void>;
+    private devicesFound: (devices: USBDevice[]) => Promise<USBDevice | void>;
 
     private _onconnect: (ev: USBConnectionEvent) => void;
     public set onconnect(fn: (ev: USBConnectionEvent) => void) {
@@ -220,7 +220,7 @@ export class USB extends (EventDispatcher as new() => TypedDispatcher<USBEvents>
      * Gets all allowed Web USB devices which are connected
      * @returns Promise containing an array of devices
      */
-    public getDevices(): Promise<Array<USBDevice>> {
+    public getDevices(): Promise<USBDevice[]> {
         // Create pre-filters
         const preFilters: USBDeviceFilter[] = this.allowedDevices.map(device => ({
             vendorId: device.vendorId || undefined,
