@@ -118,24 +118,24 @@ export class USBAdapter extends EventEmitter implements Adapter {
     public static EVENT_DEVICE_DISCONNECT: string = "disconnect";
 
     // Maintains a live list of connected Web USB devices
-    private devices: { [key: string]: { device: Device, url: string }} = {};
+    private devices: { [key: string]: { device: Device, url: string } } = {};
 
     constructor() {
         super();
 
         const attachCallback = device => {
             this.loadDevice(device, DEFAULT_RETRY_COUNT)
-            .then(loadedDevice => {
-                if (loadedDevice) {
-                    const handle = this.getDeviceHandle(loadedDevice);
-                    this.devicetoUSBDevice(handle)
-                    .then(usbDevice => {
-                        if (usbDevice) {
-                            this.emit(USBAdapter.EVENT_DEVICE_CONNECT, usbDevice);
-                        }
-                    });
-                }
-            });
+                .then(loadedDevice => {
+                    if (loadedDevice) {
+                        const handle = this.getDeviceHandle(loadedDevice);
+                        this.devicetoUSBDevice(handle)
+                            .then(usbDevice => {
+                                if (usbDevice) {
+                                    this.emit(USBAdapter.EVENT_DEVICE_CONNECT, usbDevice);
+                                }
+                            });
+                    }
+                });
         };
 
         const detachCallback = device => {
@@ -187,15 +187,15 @@ export class USBAdapter extends EventEmitter implements Adapter {
     private serialPromises<T>(task: (param: any) => Promise<T>, params: Array<any>): Promise<Array<T>> {
         function reducer(chain, param) {
             return chain
-            .then(results => {
-                return task.call(this, param)
-                .then(result => {
-                    if (result) {
-                        results.push(result);
-                    }
-                    return results;
+                .then(results => {
+                    return task.call(this, param)
+                        .then(result => {
+                            if (result) {
+                                results.push(result);
+                            }
+                            return results;
+                        });
                 });
-            });
         }
         return params.reduce(reducer.bind(this), Promise.resolve([]));
     }
@@ -203,13 +203,13 @@ export class USBAdapter extends EventEmitter implements Adapter {
     private serialDevicePromises<T>(task: (device: Device, descriptor: any) => Promise<T>, device: Device, descriptors: Array<any>): Promise<Array<T>> {
         function reducer(chain, descriptor) {
             return chain
-            .then(results => {
-                return task.call(this, device, descriptor)
-                .then(result => {
-                    results.push(result);
-                    return results;
+                .then(results => {
+                    return task.call(this, device, descriptor)
+                        .then(result => {
+                            results.push(result);
+                            return results;
+                        });
                 });
-            });
         }
         return descriptors.reduce(reducer.bind(this), Promise.resolve([]));
     }
@@ -223,17 +223,17 @@ export class USBAdapter extends EventEmitter implements Adapter {
     private retryPromise(fn: () => Promise<any>, retries: number = 0, timeout: number = DEFAULT_DELAY_TIMEOUT): Promise<void> {
         return new Promise((resolve, reject) => {
             fn()
-            .then(resolve)
-            .catch(error => {
-                if (retries === 0) {
-                    return reject(error);
-                }
-
-                return this.delay(timeout)
-                .then(() => this.retryPromise(fn, --retries, timeout))
                 .then(resolve)
-                .catch(retryError => reject(retryError));
-            });
+                .catch(error => {
+                    if (retries === 0) {
+                        return reject(error);
+                    }
+
+                    return this.delay(timeout)
+                        .then(() => this.retryPromise(fn, --retries, timeout))
+                        .then(resolve)
+                        .catch(retryError => reject(retryError));
+                });
         });
     }
 
@@ -279,18 +279,18 @@ export class USBAdapter extends EventEmitter implements Adapter {
         }
 
         return this.getCapabilities(device, retries)
-        .then(capabilities => this.getWebCapability(capabilities))
-        .then(capability => {
-            return this.getWebUrl(device, capability)
-            .then(url => {
-                const handle = this.getDeviceHandle(device);
-                this.devices[handle] = {
-                    device: device,
-                    url: url
-                };
-                return device;
+            .then(capabilities => this.getWebCapability(capabilities))
+            .then(capability => {
+                return this.getWebUrl(device, capability)
+                    .then(url => {
+                        const handle = this.getDeviceHandle(device);
+                        this.devices[handle] = {
+                            device: device,
+                            url: url
+                        };
+                        return device;
+                    });
             });
-        });
     }
 
     private async getCapabilities(device: Device, retries: number): Promise<Array<Capability>> {
@@ -305,8 +305,8 @@ export class USBAdapter extends EventEmitter implements Adapter {
             try {
                 // Older macs (<10.12) can error with some host devices during a close at this point
                 device.close();
-            // tslint:disable-next-line:no-empty
-            } catch (_error) {}
+                // tslint:disable-next-line:no-empty
+            } catch (_error) { }
         }
     }
 
@@ -330,51 +330,52 @@ export class USBAdapter extends EventEmitter implements Adapter {
         const data3 = `0000${buffer.readUInt16LE(6).toString(16)}`.slice(-4);
 
         const data4 = [];
-        for (let i = 8; i < 10; i ++) {
+        for (let i = 8; i < 10; i++) {
             data4.push(`00${buffer.readUInt8(i).toString(16)}`.slice(-2));
         }
 
         const data5 = [];
-        for (let i = 10; i < 16; i ++) {
+        for (let i = 10; i < 16; i++) {
             data5.push(`00${buffer.readUInt8(i).toString(16)}`.slice(-2));
         }
 
         return `${data1}-${data2}-${data3}-${data4.join("")}-${data5.join("")}`;
     }
 
-    private getWebUrl(device: Device, capability: Capability, suppressErrors: boolean = true): Promise<string> {
-        return new Promise((resolve, reject) => {
-            if (!capability || !capability.data || capability.data.byteLength < 20) return resolve(null);
+    private async getWebUrl(device: Device, capability: Capability, suppressErrors: boolean = true): Promise<string> {
+        try {
+            if (!capability || !capability.data || capability.data.byteLength < 20) return null;
 
             const vendor = capability.data.readUInt8(19);
             const page = capability.data.readUInt8(20);
 
-            this.openDevice(device)
-            .then(() => {
-                device.controlTransfer(CONSTANTS.URL_REQUEST_TYPE, vendor, page, CONSTANTS.URL_REQUEST_INDEX, 64, (error, buffer) => {
+            await this.openDevice(device)
+            try {
+                const buffer = await device.controlTransfer(CONSTANTS.URL_REQUEST_TYPE, vendor, page, CONSTANTS.URL_REQUEST_INDEX, 64);
+
+                // const length = buffer.readUInt8(0);
+                // const type = buffer.readUInt8(1);
+                let url = buffer.toString("utf8", 3);
+
+                const scheme = buffer.readUInt8(2); // 0 - http, 1 - https, 255 - in url
+                if (scheme === 0) url = "http://" + url;
+                if (scheme === 1) url = "https://" + url;
+
+                return url;
+            }
+            finally {
+                try {
+                    // Older macs (<10.12) can error with some host devices during a close at this point
                     device.close();
-
-                    if (error) {
-                        // An error may be due to the URL not existing
-                        if (suppressErrors) return resolve(null);
-                        else return reject(error);
-                    }
-
-                    // const length = buffer.readUInt8(0);
-                    // const type = buffer.readUInt8(1);
-                    let url = buffer.toString("utf8", 3);
-
-                    const scheme = buffer.readUInt8(2); // 0 - http, 1 - https, 255 - in url
-                    if (scheme === 0) url = "http://" + url;
-                    if (scheme === 1) url = "https://" + url;
-
-                    resolve(url);
-                });
-            })
-            .catch(_error => {
-                resolve("");
-            });
-        });
+                    // tslint:disable-next-line:no-empty
+                } catch (_error) { }
+            }
+        }
+        catch (error) {
+            if (suppressErrors)
+                return "";
+            throw error;
+        }
     }
 
     private devicetoUSBDevice(handle: string): Promise<USBDevice> {
@@ -397,57 +398,57 @@ export class USBAdapter extends EventEmitter implements Adapter {
             if (!configs) return resolve(null);
 
             return this.serialDevicePromises(this.configToUSBConfiguration, device, configs)
-            .then(configurations => {
+                .then(configurations => {
 
-                if (!deviceDescriptor) {
-                    return resolve(new USBDevice({
-                        _handle: this.getDeviceHandle(device),
-                        url: url,
-                        configurations: configurations
-                    }));
-                }
+                    if (!deviceDescriptor) {
+                        return resolve(new USBDevice({
+                            _handle: this.getDeviceHandle(device),
+                            url: url,
+                            configurations: configurations
+                        }));
+                    }
 
-                const deviceVersion = this.decodeVersion(deviceDescriptor.bcdDevice);
-                const usbVersion = this.decodeVersion(deviceDescriptor.bcdUSB);
-                let manufacturerName = null;
-                let productName = null;
+                    const deviceVersion = this.decodeVersion(deviceDescriptor.bcdDevice);
+                    const usbVersion = this.decodeVersion(deviceDescriptor.bcdUSB);
+                    let manufacturerName = null;
+                    let productName = null;
 
-                return this.getStringDescriptor(device, deviceDescriptor.iManufacturer)
-                .then(name => {
-                    manufacturerName = name;
-                    return this.getStringDescriptor(device, deviceDescriptor.iProduct);
-                })
-                .then(name => {
-                    productName = name;
-                    return this.getStringDescriptor(device, deviceDescriptor.iSerialNumber);
-                })
-                .then(serialNumber => {
-                    const props: Partial<USBDevice> = {
-                        _handle: this.getDeviceHandle(device),
-                        _maxPacketSize: deviceDescriptor.bMaxPacketSize0,
-                        url: url,
-                        deviceClass: deviceDescriptor.bDeviceClass,
-                        deviceSubclass: deviceDescriptor.bDeviceSubClass,
-                        deviceProtocol: deviceDescriptor.bDeviceProtocol,
-                        productId: deviceDescriptor.idProduct,
-                        vendorId: deviceDescriptor.idVendor,
-                        deviceVersionMajor: deviceVersion.major,
-                        deviceVersionMinor: deviceVersion.minor,
-                        deviceVersionSubminor: deviceVersion.sub,
-                        usbVersionMajor: usbVersion.major,
-                        usbVersionMinor: usbVersion.minor,
-                        usbVersionSubminor: usbVersion.sub,
-                        manufacturerName: manufacturerName,
-                        productName: productName,
-                        serialNumber: serialNumber,
-                        configurations: configurations,
-                        _currentConfiguration: configDescriptor?.bConfigurationValue
-                    };
-                    return resolve(new USBDevice(props));
+                    return this.getStringDescriptor(device, deviceDescriptor.iManufacturer)
+                        .then(name => {
+                            manufacturerName = name;
+                            return this.getStringDescriptor(device, deviceDescriptor.iProduct);
+                        })
+                        .then(name => {
+                            productName = name;
+                            return this.getStringDescriptor(device, deviceDescriptor.iSerialNumber);
+                        })
+                        .then(serialNumber => {
+                            const props: Partial<USBDevice> = {
+                                _handle: this.getDeviceHandle(device),
+                                _maxPacketSize: deviceDescriptor.bMaxPacketSize0,
+                                url: url,
+                                deviceClass: deviceDescriptor.bDeviceClass,
+                                deviceSubclass: deviceDescriptor.bDeviceSubClass,
+                                deviceProtocol: deviceDescriptor.bDeviceProtocol,
+                                productId: deviceDescriptor.idProduct,
+                                vendorId: deviceDescriptor.idVendor,
+                                deviceVersionMajor: deviceVersion.major,
+                                deviceVersionMinor: deviceVersion.minor,
+                                deviceVersionSubminor: deviceVersion.sub,
+                                usbVersionMajor: usbVersion.major,
+                                usbVersionMinor: usbVersion.minor,
+                                usbVersionSubminor: usbVersion.sub,
+                                manufacturerName: manufacturerName,
+                                productName: productName,
+                                serialNumber: serialNumber,
+                                configurations: configurations,
+                                _currentConfiguration: configDescriptor?.bConfigurationValue
+                            };
+                            return resolve(new USBDevice(props));
+                        });
+                }).catch(_error => {
+                    resolve(null);
                 });
-            }).catch(_error => {
-                resolve(null);
-            });
         });
     }
 
@@ -465,15 +466,15 @@ export class USBAdapter extends EventEmitter implements Adapter {
         try {
             return await device.getStringDescriptor(index);
         }
-        catch(e) {
+        catch (e) {
             return "";
         }
         finally {
             try {
                 // Older macs (<10.12) can error with some host devices during a close at this point
                 device.close();
-            // tslint:disable-next-line:no-empty
-            } catch (_error) {}
+                // tslint:disable-next-line:no-empty
+            } catch (_error) { }
         }
     }
 
@@ -524,50 +525,50 @@ export class USBAdapter extends EventEmitter implements Adapter {
             direction: direction,
             type: (descriptor.bmAttributes & CONSTANTS.LIBUSB_TRANSFER_TYPE_MASK) === LIBUSB_TRANSFER_TYPE_BULK ? "bulk"
                 : (descriptor.bmAttributes & CONSTANTS.LIBUSB_TRANSFER_TYPE_MASK) === LIBUSB_TRANSFER_TYPE_INTERRUPT ? "interrupt"
-                : "isochronous",
+                    : "isochronous",
             packetSize: descriptor.wMaxPacketSize
         });
     }
 
     private interfaceToUSBAlternateInterface(device: Device, descriptor: InterfaceDescriptor): Promise<USBAlternateInterface> {
         return this.getStringDescriptor(device, descriptor.iInterface)
-        .then(name => {
-            return new USBAlternateInterface({
-                alternateSetting: descriptor.bAlternateSetting,
-                interfaceClass: descriptor.bInterfaceClass,
-                interfaceSubclass: descriptor.bInterfaceSubClass,
-                interfaceProtocol: descriptor.bInterfaceProtocol,
-                interfaceName: name,
-                endpoints: descriptor.endpoints.map(this.endpointToUSBEndpoint)
+            .then(name => {
+                return new USBAlternateInterface({
+                    alternateSetting: descriptor.bAlternateSetting,
+                    interfaceClass: descriptor.bInterfaceClass,
+                    interfaceSubclass: descriptor.bInterfaceSubClass,
+                    interfaceProtocol: descriptor.bInterfaceProtocol,
+                    interfaceName: name,
+                    endpoints: descriptor.endpoints.map(this.endpointToUSBEndpoint)
+                });
             });
-        });
     }
 
     private interfacesToUSBInterface(device: Device, descriptors: Array<InterfaceDescriptor>): Promise<USBInterface> {
         return this.serialDevicePromises(this.interfaceToUSBAlternateInterface, device, descriptors)
-        .then(alternates => {
-            return new USBInterface({
-                _handle: this.getDeviceHandle(device),
-                interfaceNumber: descriptors[0].bInterfaceNumber,
-                alternates: alternates
+            .then(alternates => {
+                return new USBInterface({
+                    _handle: this.getDeviceHandle(device),
+                    interfaceNumber: descriptors[0].bInterfaceNumber,
+                    alternates: alternates
+                });
             });
-        });
     }
 
     private configToUSBConfiguration(device: Device, descriptor: ConfigDescriptor): Promise<USBConfiguration> {
         return this.getStringDescriptor(device, descriptor.iConfiguration)
-        .then(name => {
-            const allInterfaces = descriptor.interfaces || [];
+            .then(name => {
+                const allInterfaces = descriptor.interfaces || [];
 
-            return this.serialDevicePromises(this.interfacesToUSBInterface, device, allInterfaces)
-            .then(interfaces => {
-                return new USBConfiguration({
-                    configurationValue: descriptor.bConfigurationValue,
-                    configurationName: name,
-                    interfaces: interfaces
-                });
+                return this.serialDevicePromises(this.interfacesToUSBInterface, device, allInterfaces)
+                    .then(interfaces => {
+                        return new USBConfiguration({
+                            configurationValue: descriptor.bConfigurationValue,
+                            configurationName: name,
+                            interfaces: interfaces
+                        });
+                    });
             });
-        });
     }
 
     private getDevice(handle: string): Device {
@@ -577,13 +578,13 @@ export class USBAdapter extends EventEmitter implements Adapter {
 
     private controlTransferParamsToType(setup: USBControlTransferParameters, direction: number): number {
         const recipient = setup.recipient === "device" ? LIBUSB_RECIPIENT_DEVICE
-                        : setup.recipient === "interface" ? LIBUSB_RECIPIENT_INTERFACE
-                        : setup.recipient === "endpoint" ? LIBUSB_RECIPIENT_ENDPOINT
-                        : LIBUSB_RECIPIENT_OTHER;
+            : setup.recipient === "interface" ? LIBUSB_RECIPIENT_INTERFACE
+                : setup.recipient === "endpoint" ? LIBUSB_RECIPIENT_ENDPOINT
+                    : LIBUSB_RECIPIENT_OTHER;
 
         const requestType = setup.requestType === "standard" ? LIBUSB_REQUEST_TYPE_STANDARD
-                          : setup.requestType === "class" ? LIBUSB_REQUEST_TYPE_CLASS
-                          : LIBUSB_REQUEST_TYPE_VENDOR;
+            : setup.requestType === "class" ? LIBUSB_REQUEST_TYPE_CLASS
+                : LIBUSB_REQUEST_TYPE_VENDOR;
 
         return recipient | requestType | direction;
     }
@@ -613,9 +614,9 @@ export class USBAdapter extends EventEmitter implements Adapter {
 
     public listUSBDevices(preFilters?: Array<USBDeviceFilter>): Promise<Array<USBDevice>> {
         return this.loadDevices(preFilters)
-        .then(() => {
-            return this.serialPromises(this.devicetoUSBDevice, Object.keys(this.devices));
-        });
+            .then(() => {
+                return this.serialPromises(this.devicetoUSBDevice, Object.keys(this.devices));
+            });
     }
 
     public open(handle: string): Promise<void> {
@@ -657,58 +658,53 @@ export class USBAdapter extends EventEmitter implements Adapter {
         return iface.setAltSetting(alternateSetting);
     }
 
-    public controlTransferIn(handle: string, setup: USBControlTransferParameters, length: number): Promise<USBInTransferResult> {
-        return new Promise((resolve, reject) => {
-            const device = this.getDevice(handle);
-            const type = this.controlTransferParamsToType(setup, LIBUSB_ENDPOINT_IN);
+    public async controlTransferIn(handle: string, setup: USBControlTransferParameters, length: number): Promise<USBInTransferResult> {
+        const device = this.getDevice(handle);
+        const type = this.controlTransferParamsToType(setup, LIBUSB_ENDPOINT_IN);
 
-            device.controlTransfer(type, setup.request, setup.value, setup.index, length, (error, buffer) => {
-                if (error) {
-                    if (error.errno === LIBUSB_TRANSFER_STALL) {
-                        return resolve({
-                            status: "stall"
-                        });
-                    } else if (error.errno === LIBUSB_TRANSFER_OVERFLOW) {
-                        return resolve({
-                            status: "babble"
-                        });
-                    }
+        try {
+            const buffer = await device.controlTransfer(type, setup.request, setup.value, setup.index, length);
+            return {
+                data: this.bufferToDataView(buffer),
+                status: "ok"
+            };
+        }
+        catch (error) {
+            if (error.errno === LIBUSB_TRANSFER_STALL) {
+                return {
+                    status: "stall"
+                };
+            } else if (error.errno === LIBUSB_TRANSFER_OVERFLOW) {
+                return {
+                    status: "babble"
+                };
+            }
 
-                    return reject(error);
-                }
-
-                resolve({
-                    data: this.bufferToDataView(buffer),
-                    status: "ok"
-                });
-            });
-        });
+            throw error;
+        }
     }
 
-    public controlTransferOut(handle: string, setup: USBControlTransferParameters, data?: ArrayBuffer | ArrayBufferView): Promise<USBOutTransferResult> {
-        return new Promise((resolve, reject) => {
-            const device = this.getDevice(handle);
-            const type = this.controlTransferParamsToType(setup, LIBUSB_ENDPOINT_OUT);
-            const buffer = data ? this.bufferSourceToBuffer(data) : new Buffer(0);
+    public async controlTransferOut(handle: string, setup: USBControlTransferParameters, data?: ArrayBuffer | ArrayBufferView): Promise<USBOutTransferResult> {
+        const device = this.getDevice(handle);
+        const type = this.controlTransferParamsToType(setup, LIBUSB_ENDPOINT_OUT);
+        const buffer = data ? this.bufferSourceToBuffer(data) : new Buffer(0);
 
-            device.controlTransfer(type, setup.request, setup.value, setup.index, buffer, error => {
-                if (error) {
-                    if (error.errno === LIBUSB_TRANSFER_STALL) {
-                        return resolve({
-                            bytesWritten: 0,
-                            status: "stall"
-                        });
-                    }
-
-                    return reject(error);
-                }
-
-                resolve({
-                    bytesWritten: buffer.byteLength, // hack, should be bytes actually written
-                    status: "ok" // hack
-                });
-            });
-        });
+        try {
+            await device.controlTransfer(type, setup.request, setup.value, setup.index, buffer);
+            return {
+                bytesWritten: buffer.byteLength, // hack, should be bytes actually written
+                status: "ok"
+            };
+        }
+        catch (error) {
+            if (error.errno === LIBUSB_TRANSFER_STALL) {
+                return {
+                    bytesWritten: 0,
+                    status: "stall"
+                };
+            }
+            throw error;
+        }
     }
 
     public clearHalt(handle: string, direction: USBDirection, endpointNumber: number): Promise<void> {
