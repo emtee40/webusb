@@ -242,7 +242,7 @@ export class USBAdapter extends EventEmitter implements Adapter {
         }));
     }
 
-    private loadDevice(device: Device, retries: number = 0): Promise<Device> {
+    private async loadDevice(device: Device, retries: number = 0): Promise<Device> {
 
         // Early guard against unsupported USB devices
         try {
@@ -256,19 +256,15 @@ export class USBAdapter extends EventEmitter implements Adapter {
             return Promise.resolve(null);
         }
 
-        return this.getCapabilities(device, retries)
-            .then(capabilities => this.getWebCapability(capabilities))
-            .then(capability => {
-                return this.getWebUrl(device, capability)
-                    .then(url => {
-                        const handle = this.getDeviceHandle(device);
-                        this.devices[handle] = {
-                            device: device,
-                            url: url
-                        };
-                        return device;
-                    });
-            });
+        const capabilities = await this.getCapabilities(device, retries);
+        const capability = this.getWebCapability(capabilities);
+        const url = await this.getWebUrl(device, capability);
+        const handle = this.getDeviceHandle(device);
+        this.devices[handle] = {
+            device: device,
+            url: url
+        };
+        return device;
     }
 
     private async getCapabilities(device: Device, retries: number): Promise<Array<Capability>> {
@@ -495,45 +491,36 @@ export class USBAdapter extends EventEmitter implements Adapter {
         });
     }
 
-    private interfaceToUSBAlternateInterface(device: Device, descriptor: InterfaceDescriptor): Promise<USBAlternateInterface> {
-        return this.getStringDescriptor(device, descriptor.iInterface)
-            .then(name => {
-                return new USBAlternateInterface({
-                    alternateSetting: descriptor.bAlternateSetting,
-                    interfaceClass: descriptor.bInterfaceClass,
-                    interfaceSubclass: descriptor.bInterfaceSubClass,
-                    interfaceProtocol: descriptor.bInterfaceProtocol,
-                    interfaceName: name,
-                    endpoints: descriptor.endpoints.map(this.endpointToUSBEndpoint)
-                });
-            });
+    private async interfaceToUSBAlternateInterface(device: Device, descriptor: InterfaceDescriptor): Promise<USBAlternateInterface> {
+        const name = await this.getStringDescriptor(device, descriptor.iInterface);
+        return new USBAlternateInterface({
+            alternateSetting: descriptor.bAlternateSetting,
+            interfaceClass: descriptor.bInterfaceClass,
+            interfaceSubclass: descriptor.bInterfaceSubClass,
+            interfaceProtocol: descriptor.bInterfaceProtocol,
+            interfaceName: name,
+            endpoints: descriptor.endpoints.map(this.endpointToUSBEndpoint)
+        });
     }
 
-    private interfacesToUSBInterface(device: Device, descriptors: Array<InterfaceDescriptor>): Promise<USBInterface> {
-        return this.serialDevicePromises(this.interfaceToUSBAlternateInterface, device, descriptors)
-            .then(alternates => {
-                return new USBInterface({
-                    _handle: this.getDeviceHandle(device),
-                    interfaceNumber: descriptors[0].bInterfaceNumber,
-                    alternates: alternates
-                });
-            });
+    private async interfacesToUSBInterface(device: Device, descriptors: Array<InterfaceDescriptor>): Promise<USBInterface> {
+        const alternates = await this.serialDevicePromises(this.interfaceToUSBAlternateInterface, device, descriptors);
+        return new USBInterface({
+            _handle: this.getDeviceHandle(device),
+            interfaceNumber: descriptors[0].bInterfaceNumber,
+            alternates: alternates
+        });
     }
 
-    private configToUSBConfiguration(device: Device, descriptor: ConfigDescriptor): Promise<USBConfiguration> {
-        return this.getStringDescriptor(device, descriptor.iConfiguration)
-            .then(name => {
-                const allInterfaces = descriptor.interfaces || [];
-
-                return this.serialDevicePromises(this.interfacesToUSBInterface, device, allInterfaces)
-                    .then(interfaces => {
-                        return new USBConfiguration({
-                            configurationValue: descriptor.bConfigurationValue,
-                            configurationName: name,
-                            interfaces: interfaces
-                        });
-                    });
-            });
+    private async configToUSBConfiguration(device: Device, descriptor: ConfigDescriptor): Promise<USBConfiguration> {
+        const name = await this.getStringDescriptor(device, descriptor.iConfiguration);
+        const allInterfaces = descriptor.interfaces || [];
+        const interfaces = await this.serialDevicePromises(this.interfacesToUSBInterface, device, allInterfaces);
+        return new USBConfiguration({
+            configurationValue: descriptor.bConfigurationValue,
+            configurationName: name,
+            interfaces: interfaces
+        });
     }
 
     private getDevice(handle: string): Device {
@@ -554,17 +541,8 @@ export class USBAdapter extends EventEmitter implements Adapter {
         return recipient | requestType | direction;
     }
 
-    private openDevice(device: Device, retries: number = 0): Promise<void> {
-        return this.retryPromise(() => {
-            return new Promise<void>((resolve, reject) => {
-                try {
-                    device.open();
-                } catch (error) {
-                    return reject(error);
-                }
-                resolve();
-            });
-        }, retries);
+    private async openDevice(device: Device, retries: number = 0): Promise<void> {
+        return this.retryPromise(async () => device.open(), retries);
     }
 
     public getConnected(handle: string): boolean {
@@ -587,37 +565,29 @@ export class USBAdapter extends EventEmitter implements Adapter {
         return this.openDevice(device);
     }
 
-    public close(handle: string): Promise<void> {
-        return new Promise((resolve, _reject) => {
-            const device = this.getDevice(handle);
-            device.close();
-            resolve();
-        });
-    }
+    public async close(handle: string): Promise<void> {
+        const device = this.getDevice(handle);
+        device.close();
+}
 
-    public selectConfiguration(handle: string, id: number): Promise<void> {
+    public async selectConfiguration(handle: string, id: number): Promise<void> {
         const device = this.getDevice(handle);
         return device.setConfiguration(id);
     }
 
-    public claimInterface(handle: string, address: number): Promise<void> {
-        return new Promise((resolve, _reject) => {
-            const device = this.getDevice(handle);
+    public async claimInterface(handle: string, address: number): Promise<void> {
+        const device = this.getDevice(handle);
+        device.interface(address).claim();
+}
 
-            device.interface(address).claim();
-            resolve();
-        });
-    }
-
-    public releaseInterface(handle: string, address: number): Promise<void> {
+    public async releaseInterface(handle: string, address: number): Promise<void> {
         const device = this.getDevice(handle);
         return device.interface(address).release();
     }
 
-    public selectAlternateInterface(handle: string, interfaceNumber: number, alternateSetting: number): Promise<void> {
+    public async selectAlternateInterface(handle: string, interfaceNumber: number, alternateSetting: number): Promise<void> {
         const device = this.getDevice(handle);
         const iface = device.interface(interfaceNumber);
-
         return iface.setAltSetting(alternateSetting);
     }
 
