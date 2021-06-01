@@ -440,8 +440,7 @@ export class USBAdapter extends EventEmitter implements Adapter {
     }
 
     private bufferToDataView(buffer: Buffer): DataView {
-        const arrayBuffer = new Uint8Array(buffer).buffer;
-        return new DataView(arrayBuffer);
+        return new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
     }
 
     private bufferSourceToBuffer(bufferSource: ArrayBuffer | ArrayBufferView): Buffer {
