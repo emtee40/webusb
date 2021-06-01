@@ -789,13 +789,8 @@ export class USBAdapter extends EventEmitter implements Adapter {
     }
 
     public reset(handle: string): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const device = this.getDevice(handle);
-            device.reset(error => {
-                if (error) return reject(error);
-                resolve();
-            });
-        });
+        const device = this.getDevice(handle);
+        return device.reset();
     }
 }
 
