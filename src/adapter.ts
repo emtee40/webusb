@@ -184,22 +184,6 @@ export class USBAdapter extends EventEmitter implements Adapter {
         return `${device.busNumber}.${device.deviceAddress}`;
     }
 
-    private serialPromises<T>(task: (param: any) => Promise<T>, params: Array<any>): Promise<Array<T>> {
-        function reducer(chain, param) {
-            return chain
-                .then(results => {
-                    return task.call(this, param)
-                        .then(result => {
-                            if (result) {
-                                results.push(result);
-                            }
-                            return results;
-                        });
-                });
-        }
-        return params.reduce(reducer.bind(this), Promise.resolve([]));
-    }
-
     private serialDevicePromises<T>(task: (device: Device, descriptor: any) => Promise<T>, device: Device, descriptors: Array<any>): Promise<Array<T>> {
         function reducer(chain, descriptor) {
             return chain
@@ -214,30 +198,24 @@ export class USBAdapter extends EventEmitter implements Adapter {
         return descriptors.reduce(reducer.bind(this), Promise.resolve([]));
     }
 
-    private delay(timeout: number = DEFAULT_DELAY_TIMEOUT): Promise<void> {
-        return new Promise((resolve, _reject) => {
-            setTimeout(resolve, timeout);
-        });
+    private async delay(timeout: number = DEFAULT_DELAY_TIMEOUT): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, timeout));
     }
 
-    private retryPromise(fn: () => Promise<any>, retries: number = 0, timeout: number = DEFAULT_DELAY_TIMEOUT): Promise<void> {
-        return new Promise((resolve, reject) => {
-            fn()
-                .then(resolve)
-                .catch(error => {
-                    if (retries === 0) {
-                        return reject(error);
-                    }
-
-                    return this.delay(timeout)
-                        .then(() => this.retryPromise(fn, --retries, timeout))
-                        .then(resolve)
-                        .catch(retryError => reject(retryError));
-                });
-        });
+    private async retryPromise(fn: () => Promise<any>, retries: number = 0, timeout: number = DEFAULT_DELAY_TIMEOUT): Promise<void> {
+        for (let i = 0; i < retries + 1; i++) {
+            try {
+                return await fn();
+            }
+            catch (error) {
+                await this.delay(timeout);
+                if (i === retries)
+                    throw error;
+            }
+        }
     }
 
-    private loadDevices(preFilters?: Array<USBDeviceFilter>): Promise<Array<Device>> {
+    private async loadDevices(preFilters?: Array<USBDeviceFilter>): Promise<Device[]> {
         // Reset device cache
         this.devices = {};
         let devices = getDeviceList();
@@ -247,7 +225,7 @@ export class USBAdapter extends EventEmitter implements Adapter {
             devices = this.preFilterDevices(devices, preFilters);
         }
 
-        return this.serialPromises(this.loadDevice, devices);
+        return Promise.all(devices.map(device => this.loadDevice(device)));
     }
 
     private preFilterDevices(devices: Array<Device>, preFilters: Array<USBDeviceFilter>): Array<Device> {
@@ -378,78 +356,65 @@ export class USBAdapter extends EventEmitter implements Adapter {
         }
     }
 
-    private devicetoUSBDevice(handle: string): Promise<USBDevice> {
-        return new Promise((resolve, _reject) => {
-            const device = this.devices[handle].device;
-            const url = this.devices[handle].url;
+    private async devicetoUSBDevice(handle: string): Promise<USBDevice> {
+        const device = this.devices[handle].device;
+        const url = this.devices[handle].url;
 
-            let configs: Array<ConfigDescriptor> = null;
-            let configDescriptor: ConfigDescriptor = null;
-            let deviceDescriptor: DeviceDescriptor = null;
+        let configs: Array<ConfigDescriptor> = null;
+        let configDescriptor: ConfigDescriptor = null;
+        let deviceDescriptor: DeviceDescriptor = null;
 
-            try {
-                configDescriptor = device.configDescriptor;
-                configs = device.allConfigDescriptors;
-                deviceDescriptor = device.deviceDescriptor;
-            } catch (_error) {
-                return resolve(null);
+        try {
+            configDescriptor = device.configDescriptor;
+            configs = device.allConfigDescriptors;
+            deviceDescriptor = device.deviceDescriptor;
+        } catch (_error) {
+            return null;
+        }
+
+        if (!configs) return null;
+
+        try {
+            const configurations = await this.serialDevicePromises(this.configToUSBConfiguration, device, configs);
+            if (!deviceDescriptor) {
+                return new USBDevice({
+                    _handle: this.getDeviceHandle(device),
+                    url: url,
+                    configurations: configurations
+                });
             }
 
-            if (!configs) return resolve(null);
-
-            return this.serialDevicePromises(this.configToUSBConfiguration, device, configs)
-                .then(configurations => {
-
-                    if (!deviceDescriptor) {
-                        return resolve(new USBDevice({
-                            _handle: this.getDeviceHandle(device),
-                            url: url,
-                            configurations: configurations
-                        }));
-                    }
-
-                    const deviceVersion = this.decodeVersion(deviceDescriptor.bcdDevice);
-                    const usbVersion = this.decodeVersion(deviceDescriptor.bcdUSB);
-                    let manufacturerName = null;
-                    let productName = null;
-
-                    return this.getStringDescriptor(device, deviceDescriptor.iManufacturer)
-                        .then(name => {
-                            manufacturerName = name;
-                            return this.getStringDescriptor(device, deviceDescriptor.iProduct);
-                        })
-                        .then(name => {
-                            productName = name;
-                            return this.getStringDescriptor(device, deviceDescriptor.iSerialNumber);
-                        })
-                        .then(serialNumber => {
-                            const props: Partial<USBDevice> = {
-                                _handle: this.getDeviceHandle(device),
-                                _maxPacketSize: deviceDescriptor.bMaxPacketSize0,
-                                url: url,
-                                deviceClass: deviceDescriptor.bDeviceClass,
-                                deviceSubclass: deviceDescriptor.bDeviceSubClass,
-                                deviceProtocol: deviceDescriptor.bDeviceProtocol,
-                                productId: deviceDescriptor.idProduct,
-                                vendorId: deviceDescriptor.idVendor,
-                                deviceVersionMajor: deviceVersion.major,
-                                deviceVersionMinor: deviceVersion.minor,
-                                deviceVersionSubminor: deviceVersion.sub,
-                                usbVersionMajor: usbVersion.major,
-                                usbVersionMinor: usbVersion.minor,
-                                usbVersionSubminor: usbVersion.sub,
-                                manufacturerName: manufacturerName,
-                                productName: productName,
-                                serialNumber: serialNumber,
-                                configurations: configurations,
-                                _currentConfiguration: configDescriptor?.bConfigurationValue
-                            };
-                            return resolve(new USBDevice(props));
-                        });
-                }).catch(_error => {
-                    resolve(null);
-                });
-        });
+            const deviceVersion = this.decodeVersion(deviceDescriptor.bcdDevice);
+            const usbVersion = this.decodeVersion(deviceDescriptor.bcdUSB);
+            let manufacturerName = await this.getStringDescriptor(device, deviceDescriptor.iManufacturer);
+            let productName = await this.getStringDescriptor(device, deviceDescriptor.iProduct); 0
+            let serialNumber = await this.getStringDescriptor(device, deviceDescriptor.iSerialNumber)
+            const props: Partial<USBDevice> = {
+                _handle: this.getDeviceHandle(device),
+                _maxPacketSize: deviceDescriptor.bMaxPacketSize0,
+                url: url,
+                deviceClass: deviceDescriptor.bDeviceClass,
+                deviceSubclass: deviceDescriptor.bDeviceSubClass,
+                deviceProtocol: deviceDescriptor.bDeviceProtocol,
+                productId: deviceDescriptor.idProduct,
+                vendorId: deviceDescriptor.idVendor,
+                deviceVersionMajor: deviceVersion.major,
+                deviceVersionMinor: deviceVersion.minor,
+                deviceVersionSubminor: deviceVersion.sub,
+                usbVersionMajor: usbVersion.major,
+                usbVersionMinor: usbVersion.minor,
+                usbVersionSubminor: usbVersion.sub,
+                manufacturerName: manufacturerName,
+                productName: productName,
+                serialNumber: serialNumber,
+                configurations: configurations,
+                _currentConfiguration: configDescriptor?.bConfigurationValue
+            };
+            return new USBDevice(props);
+        }
+        catch (error) {
+            return null;
+        }
     }
 
     private decodeVersion(version: number): { [key: string]: number } {
@@ -612,11 +577,9 @@ export class USBAdapter extends EventEmitter implements Adapter {
         return (device.interfaces !== null);
     }
 
-    public listUSBDevices(preFilters?: Array<USBDeviceFilter>): Promise<Array<USBDevice>> {
-        return this.loadDevices(preFilters)
-            .then(() => {
-                return this.serialPromises(this.devicetoUSBDevice, Object.keys(this.devices));
-            });
+    public async listUSBDevices(preFilters?: Array<USBDeviceFilter>): Promise<USBDevice[]> {
+        await this.loadDevices(preFilters);
+        return Promise.all(Object.keys(this.devices).map(device => this.devicetoUSBDevice(device)));
     }
 
     public open(handle: string): Promise<void> {
