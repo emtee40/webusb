@@ -2,7 +2,7 @@
     "compilerOptions": {
         "allowSyntheticDefaultImports": true,
         "moduleResolution": "node",
-        "target": "es6",
+        "target": "es2017",
         "module": "commonjs",
         "esModuleInterop": true,
         "outDir": "dist",
@@ -12,7 +12,6 @@
         "noUnusedParameters": true,
         "sourceMap": true,
         "declaration": true,
-        "declarationDir": "types",
         "skipLibCheck": true
     }
 }
