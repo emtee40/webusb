@@ -267,9 +267,6 @@ export class USBDevice implements W3CUSBDevice {
      * @returns Promise containing any error
      */
     public async selectConfiguration(configurationValue: number): Promise<void> {
-        // Don't change the configuration if it's already set correctly
-        if (configurationValue === this._currentConfiguration) return;
-
         if (!this.connected) throw new Error("selectConfiguration error: device not found");
 
         const config = this.configurations.find(configuration => configuration.configurationValue === configurationValue);
