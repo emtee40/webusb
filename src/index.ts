@@ -23,7 +23,7 @@
 * SOFTWARE.
 */
 
-import { USB, USBOptions } from "./usb";
+import { USB, USBOptions, USBEvents } from "./usb";
 
 /**
  * Default usb instance synonymous with `navigator.usb`
@@ -33,7 +33,7 @@ export const usb = new USB();
 /**
  * USB class for creating new instances
  */
-export { USB, USBOptions };
+export { USB, USBOptions, USBEvents };
 
 /**
  * Adapter
