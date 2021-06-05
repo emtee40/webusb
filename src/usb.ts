@@ -40,7 +40,7 @@ export interface USBOptions {
 }
 
 /**
- * @hidden
+ * USB Events
  */
 export interface USBEvents {
     /**
